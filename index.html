@@ -163,6 +163,56 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
+    gap:6px;
+  }
+  .day-header-left{display:flex;align-items:center;gap:8px;}
+  .day-add-btn{
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    border:1px solid var(--accent);
+    background:#fff;
+    color:var(--accent);
+    font-size:14px;
+    line-height:1;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+  .day-add-btn:hover{background:var(--accent);color:#fff;}
+  .quick-add-form{
+    background:var(--btn-bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px;
+    margin-bottom:8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .quick-add-form input[type="text"], .quick-add-form input[type="time"]{
+    font-family:inherit;
+    font-size:12px;
+    padding:6px 8px;
+    border-radius:6px;
+    border:1px solid var(--btn-border);
+    background:#fff;
+    color:var(--dark);
+  }
+  .quick-add-form .quick-add-row{
+    display:flex;
+    gap:6px;
+  }
+  .quick-add-form .quick-add-actions{
+    display:flex;
+    gap:6px;
+    justify-content:flex-end;
+  }
+  .quick-add-form .quick-add-actions button{
+    padding:4px 10px;
+    font-size:12px;
   }
   .day-count{
     font-size:11px;
@@ -201,13 +251,14 @@
     color:var(--accent);
     white-space:nowrap;
   }
-  .card-text{
+  .card-cliente{
     font-size:13px;
     font-weight:600;
+    color:var(--dark);
     margin:3px 0 2px 0;
     word-break:break-word;
   }
-  .card-cliente{
+  .card-text{
     font-size:12px;
     color:#5A6B78;
     margin-bottom:3px;
@@ -291,9 +342,9 @@
 
 <div class="toolbar">
   <select id="diaSelect"></select>
-  <input type="time" id="horaInput" value="09:00">
-  <input type="text" id="textoInput" placeholder="Visita o tarea...">
+  <input type="time" id="horaInput" value="08:00">
   <input type="text" id="clienteInput" placeholder="Cliente / lugar (opcional)">
+  <input type="text" id="textoInput" placeholder="Visita o tarea...">
   <textarea id="notaInput" placeholder="Notas (opcional)" rows="1"></textarea>
   <div class="priority-dots" id="prioToolbar">
     <button type="button" class="priority-dot" data-priority="rojo" style="background:#B2483C;" title="Prioridad rojo"></button>
@@ -319,6 +370,8 @@ const STORAGE_KEY = "agenda_semanal_data_v1";
 let tasks = [];
 let undoStack = [];
 let redoStack = [];
+let quickAddOpenDia = null;
+let quickAddPrio = "";
 
 function loadData(){
   try{
@@ -534,6 +587,78 @@ function prioOrder(p){
   return 3;
 }
 
+function toggleQuickAdd(diaIdx){
+  quickAddOpenDia = (quickAddOpenDia === diaIdx) ? null : diaIdx;
+  quickAddPrio = "";
+  render();
+}
+
+function renderQuickAddForm(container, diaIdx){
+  container.innerHTML = `
+    <div class="quick-add-form">
+      <div class="quick-add-row">
+        <input type="time" id="qaHora_${diaIdx}" value="08:00" style="width:90px;">
+        <input type="text" id="qaCliente_${diaIdx}" placeholder="Cliente / lugar" style="flex:1;">
+      </div>
+      <input type="text" id="qaTexto_${diaIdx}" placeholder="Visita o tarea...">
+      <div class="priority-dots" id="qaPrio_${diaIdx}">
+        <button type="button" class="priority-dot" data-priority="rojo" style="background:#B2483C;" title="Rojo"></button>
+        <button type="button" class="priority-dot" data-priority="amarillo" style="background:#F2B705;" title="Amarillo"></button>
+        <button type="button" class="priority-dot" data-priority="verde" style="background:#4C8C5B;" title="Verde"></button>
+      </div>
+      <div class="quick-add-actions">
+        <button type="button" onclick="toggleQuickAdd(${diaIdx})">Cancelar</button>
+        <button type="button" class="primary" onclick="submitQuickAdd(${diaIdx})">Añadir</button>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll(`#qaPrio_${diaIdx} .priority-dot`).forEach(dot => {
+    dot.classList.toggle("active", dot.dataset.priority === quickAddPrio);
+    dot.addEventListener("click", () => {
+      quickAddPrio = (quickAddPrio === dot.dataset.priority) ? "" : dot.dataset.priority;
+      container.querySelectorAll(`#qaPrio_${diaIdx} .priority-dot`).forEach(d => {
+        d.classList.toggle("active", d.dataset.priority === quickAddPrio);
+      });
+    });
+  });
+
+  const textoInput = container.querySelector(`#qaTexto_${diaIdx}`);
+  textoInput.addEventListener("keypress", (e) => {
+    if(e.key === "Enter") submitQuickAdd(diaIdx);
+  });
+  textoInput.focus();
+}
+
+function submitQuickAdd(diaIdx){
+  const hora = document.getElementById(`qaHora_${diaIdx}`).value;
+  const cliente = document.getElementById(`qaCliente_${diaIdx}`).value.trim();
+  const texto = document.getElementById(`qaTexto_${diaIdx}`).value.trim();
+
+  if(!texto){
+    document.getElementById(`qaTexto_${diaIdx}`).focus();
+    return;
+  }
+
+  pushUndo();
+  tasks.push({
+    id: uid(),
+    dia: diaIdx,
+    hora,
+    texto,
+    cliente,
+    nota: "",
+    priority: quickAddPrio || null,
+    done: false,
+    createdAt: new Date().toISOString()
+  });
+
+  quickAddOpenDia = null;
+  quickAddPrio = "";
+  saveData();
+  render();
+}
+
 function render(){
   const board = document.getElementById("board");
   board.innerHTML = "";
@@ -554,8 +679,15 @@ function render(){
 
     const header = document.createElement("div");
     header.className = "day-header";
-    header.innerHTML = `<span>${diaNombre}</span><span class="day-count">${dayTasks.length}</span>`;
+    header.innerHTML = `<span class="day-header-left"><span>${diaNombre}</span><button type="button" class="day-add-btn" onclick="toggleQuickAdd(${diaIdx})" title="Añadir en ${diaNombre}">+</button></span><span class="day-count">${dayTasks.length}</span>`;
     col.appendChild(header);
+
+    const quickAddContainer = document.createElement("div");
+    quickAddContainer.id = "quickAdd_" + diaIdx;
+    col.appendChild(quickAddContainer);
+    if(quickAddOpenDia === diaIdx){
+      renderQuickAddForm(quickAddContainer, diaIdx);
+    }
 
     if(dayTasks.length === 0){
       const empty = document.createElement("div");
@@ -586,8 +718,8 @@ function render(){
             <button type="button" class="priority-dot${t.priority==="verde"?" active":""}" style="background:#4C8C5B;" onclick="changePriority('${t.id}','verde')" title="Verde"></button>
           </div>
         </div>
-        <div class="card-text">${escapeHtml(t.texto)}</div>
         ${t.cliente ? `<div class="card-cliente">${escapeHtml(t.cliente)}</div>` : ""}
+        <div class="card-text">${escapeHtml(t.texto)}</div>
         ${notaHtml}
         <div class="card-actions">
           <button onclick="toggleDone('${t.id}')">${t.done ? "Reabrir" : "Hecho"}</button>
