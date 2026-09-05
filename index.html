@@ -23,6 +23,22 @@
     --border:#E3DAC2;
     --muted:#8A8270;
   }
+  body.dark-mode{
+    --accent:#6FA8DC;
+    --dark:#F2F0EA;
+    --btn-bg:#23262B;
+    --btn-border:#3C4048;
+    --btn-hover-bg:#2E323A;
+    --gray-off:#6B7078;
+    --bg:#121417;
+    --dot:#1D2024;
+    --card-bg:#1B1E22;
+    --red:#E06C5C;
+    --yellow:#E8C25A;
+    --green:#6FC98A;
+    --border:#3C4048;
+    --muted:#9AA0A8;
+  }
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -44,7 +60,7 @@
   .title-block{display:flex;align-items:center;gap:10px;}
   .title-block img{height:56px;width:auto;display:block;}
   h1{font-size:22px;margin:0;font-weight:700;}
-  .fecha-actual{font-size:13px;color:#6B7A87;margin-top:2px;cursor:pointer;border-bottom:1px dashed transparent;}
+  .fecha-actual{font-size:13px;color:var(--muted);margin-top:2px;cursor:pointer;border-bottom:1px dashed transparent;}
   .fecha-actual:hover{border-bottom-color:var(--muted);}
   .fecha-actual input[type="date"]{
     font-family:inherit;
@@ -217,7 +233,7 @@
   .day-count{
     font-size:11px;
     font-weight:600;
-    color:#6B7A87;
+    color:var(--muted);
     background:var(--bg);
     border-radius:10px;
     padding:2px 8px;
@@ -260,13 +276,13 @@
   }
   .card-text{
     font-size:12px;
-    color:#5A6B78;
+    color:var(--muted);
     margin-bottom:3px;
     word-break:break-word;
   }
   .card-nota{
     font-size:12px;
-    color:#7A8894;
+    color:var(--muted);
     white-space:pre-wrap;
     word-break:break-word;
     margin-bottom:4px;
@@ -286,7 +302,7 @@
   }
   .empty-day{
     font-size:12px;
-    color:#A8B3BC;
+    color:var(--muted);
     text-align:center;
     padding:14px 0;
   }
@@ -326,6 +342,7 @@
     </div>
   </div>
   <div class="backup-bar">
+    <button id="darkModeBtn" title="Cambiar contraste">Modo oscuro</button>
     <button id="viewBtn" title="Cambiar vista">Vista: Fila</button>
     <button id="printBtn" title="Imprimir">Imprimir</button>
     <button id="pdfBtn" title="Exportar PDF">Exportar PDF</button>
@@ -875,6 +892,17 @@ async function exportPdf(){
 }
 
 // ---- Eventos ----
+const DARK_KEY = "agenda_semanal_dark_v1";
+function aplicarModoOscuro(activo){
+  document.body.classList.toggle("dark-mode", activo);
+  document.getElementById("darkModeBtn").textContent = activo ? "Modo claro" : "Modo oscuro";
+  localStorage.setItem(DARK_KEY, activo ? "1" : "0");
+}
+document.getElementById("darkModeBtn").addEventListener("click", () => {
+  const activo = document.body.classList.contains("dark-mode");
+  aplicarModoOscuro(!activo);
+});
+
 document.getElementById("addBtn").addEventListener("click", addTask);
 document.querySelectorAll("#prioToolbar .priority-dot").forEach(dot => {
   dot.addEventListener("click", () => {
@@ -929,6 +957,7 @@ setFechaActual();
 initDiaSelect();
 render();
 aplicarVista(localStorage.getItem(VIEW_KEY) === "vertical");
+aplicarModoOscuro(localStorage.getItem(DARK_KEY) === "1");
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
