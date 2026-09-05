@@ -106,7 +106,7 @@
     flex-wrap:wrap;
     justify-content:flex-end;
   }
-  .share-bar{margin-top:-6px;}
+  .share-bar{margin-top:-6px;margin-bottom:16px;}
 
   button{
     font-family:inherit;
@@ -221,7 +221,7 @@
     flex-direction:column;
     gap:6px;
   }
-  .quick-add-form input[type="text"], .quick-add-form input[type="time"]{
+  .quick-add-form input[type="text"], .quick-add-form input[type="time"], .quick-add-form textarea{
     font-family:inherit;
     font-size:12px;
     padding:6px 8px;
@@ -229,6 +229,7 @@
     border:1px solid var(--btn-border);
     background:var(--card-bg);
     color:var(--dark);
+    resize:vertical;
   }
   .quick-add-form .quick-add-row{
     display:flex;
@@ -306,7 +307,9 @@
     display:flex;
     gap:4px;
     flex-wrap:wrap;
-    margin-top:4px;
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px dashed var(--border);
   }
   .card-actions button{
     padding:3px 7px;
@@ -402,6 +405,9 @@ let undoStack = [];
 let redoStack = [];
 let quickAddOpenDia = null;
 let quickAddPrio = "";
+let cardPressState = {};
+let cardTapTimes = {};
+let editingTaskId = null;
 
 function loadData(){
   try{
@@ -569,22 +575,34 @@ function deleteTask(id){
 }
 
 function editTask(id){
+  editingTaskId = id;
+  render();
+}
+
+function cancelEditTask(){
+  editingTaskId = null;
+  render();
+}
+
+function saveEditTask(id){
   const t = tasks.find(x => x.id === id);
   if(!t) return;
-  const nuevoTexto = prompt("Texto de la tarea/visita:", t.texto);
-  if(nuevoTexto === null) return;
-  const nuevoCliente = prompt("Cliente / lugar:", t.cliente || "");
-  if(nuevoCliente === null) return;
-  const nuevaHora = prompt("Hora (HH:MM):", t.hora || "");
-  if(nuevaHora === null) return;
-  const nuevaNota = prompt("Notas:", t.nota || "");
-  if(nuevaNota === null) return;
+  const hora = document.getElementById(`edHora_${id}`).value;
+  const cliente = document.getElementById(`edCliente_${id}`).value.trim();
+  const texto = document.getElementById(`edTexto_${id}`).value.trim();
+  const nota = document.getElementById(`edNota_${id}`).value.trim();
+
+  if(!texto){
+    document.getElementById(`edTexto_${id}`).focus();
+    return;
+  }
 
   pushUndo();
-  t.texto = nuevoTexto.trim() || t.texto;
-  t.cliente = nuevoCliente.trim();
-  t.hora = nuevaHora.trim();
-  t.nota = nuevaNota.trim();
+  t.hora = hora;
+  t.cliente = cliente;
+  t.texto = texto;
+  t.nota = nota;
+  editingTaskId = null;
   saveData();
   render();
 }
@@ -600,6 +618,45 @@ function changePriority(id, value){
 function toggleNota(id){
   const el = document.getElementById("nota_" + id);
   if(el) el.classList.toggle("show");
+}
+
+const LONG_PRESS_MS = 450;
+const DOUBLE_TAP_MS = 350;
+
+function onCardPointerDown(id, e){
+  if(e.target.closest("button")) return;
+  const state = { longPressed:false };
+  cardPressState[id] = state;
+  state.timer = setTimeout(() => {
+    state.longPressed = true;
+    toggleNota(id);
+  }, LONG_PRESS_MS);
+}
+
+function onCardPointerUp(id, e){
+  if(e.target.closest("button")) return;
+  const state = cardPressState[id];
+  if(state){
+    clearTimeout(state.timer);
+    delete cardPressState[id];
+    if(state.longPressed) return;
+  }
+  const now = Date.now();
+  const last = cardTapTimes[id] || 0;
+  if(now - last < DOUBLE_TAP_MS){
+    cardTapTimes[id] = 0;
+    editTask(id);
+  } else {
+    cardTapTimes[id] = now;
+  }
+}
+
+function onCardPointerCancel(id){
+  const state = cardPressState[id];
+  if(state){
+    clearTimeout(state.timer);
+    delete cardPressState[id];
+  }
 }
 
 function moveTaskToDia(id, nuevoDia){
@@ -631,6 +688,7 @@ function renderQuickAddForm(container, diaIdx){
         <input type="text" id="qaCliente_${diaIdx}" placeholder="Cliente / lugar" style="flex:1;">
       </div>
       <input type="text" id="qaTexto_${diaIdx}" placeholder="Visita o tarea...">
+      <textarea id="qaNota_${diaIdx}" placeholder="Notas (opcional)" rows="1"></textarea>
       <div class="priority-dots" id="qaPrio_${diaIdx}">
         <button type="button" class="priority-dot" data-priority="rojo" style="background:#B2483C;" title="Rojo"></button>
         <button type="button" class="priority-dot" data-priority="amarillo" style="background:#F2B705;" title="Amarillo"></button>
@@ -664,6 +722,7 @@ function submitQuickAdd(diaIdx){
   const hora = document.getElementById(`qaHora_${diaIdx}`).value;
   const cliente = document.getElementById(`qaCliente_${diaIdx}`).value.trim();
   const texto = document.getElementById(`qaTexto_${diaIdx}`).value.trim();
+  const nota = document.getElementById(`qaNota_${diaIdx}`).value.trim();
 
   if(!texto){
     document.getElementById(`qaTexto_${diaIdx}`).focus();
@@ -677,7 +736,7 @@ function submitQuickAdd(diaIdx){
     hora,
     texto,
     cliente,
-    nota: "",
+    nota,
     priority: quickAddPrio || null,
     done: false,
     createdAt: new Date().toISOString()
@@ -729,33 +788,81 @@ function render(){
     dayTasks.forEach(t => {
       const card = document.createElement("div");
       card.className = "card" + (t.priority ? " " + t.priority : "") + (t.done ? " done" : "");
-      card.draggable = true;
       card.dataset.id = t.id;
 
+      if(editingTaskId === t.id){
+        card.innerHTML = `
+          <div class="quick-add-form" style="background:transparent;border:none;padding:0;margin:0;">
+            <div class="quick-add-row">
+              <input type="time" id="edHora_${t.id}" value="${t.hora ? escapeHtml(t.hora) : ""}" style="width:90px;">
+              <input type="text" id="edCliente_${t.id}" placeholder="Cliente / lugar" value="${escapeHtml(t.cliente || "")}" style="flex:1;">
+            </div>
+            <input type="text" id="edTexto_${t.id}" placeholder="Visita o tarea..." value="${escapeHtml(t.texto || "")}">
+            <textarea id="edNota_${t.id}" placeholder="Notas (opcional)" rows="2">${escapeHtml(t.nota || "")}</textarea>
+            <div class="priority-dots" id="edPrio_${t.id}">
+              <button type="button" class="priority-dot${t.priority==="rojo"?" active":""}" data-priority="rojo" style="background:#B2483C;" title="Rojo"></button>
+              <button type="button" class="priority-dot${t.priority==="amarillo"?" active":""}" data-priority="amarillo" style="background:#F2B705;" title="Amarillo"></button>
+              <button type="button" class="priority-dot${t.priority==="verde"?" active":""}" data-priority="verde" style="background:#4C8C5B;" title="Verde"></button>
+            </div>
+            <div class="quick-add-actions">
+              <button type="button" onclick="cancelEditTask()">Cancelar</button>
+              <button type="button" class="primary" onclick="saveEditTask('${t.id}')">Guardar</button>
+            </div>
+          </div>
+        `;
+        col.appendChild(card);
+
+        let edPrio = t.priority || "";
+        card.querySelectorAll(`#edPrio_${t.id} .priority-dot`).forEach(dot => {
+          dot.addEventListener("click", () => {
+            edPrio = (edPrio === dot.dataset.priority) ? "" : dot.dataset.priority;
+            const target = tasks.find(x => x.id === t.id);
+            if(target) target.priority = edPrio || null;
+            card.querySelectorAll(`#edPrio_${t.id} .priority-dot`).forEach(d => {
+              d.classList.toggle("active", d.dataset.priority === edPrio);
+            });
+          });
+        });
+
+        const edTextoInput = card.querySelector(`#edTexto_${t.id}`);
+        edTextoInput.addEventListener("keypress", (e) => {
+          if(e.key === "Enter") saveEditTask(t.id);
+        });
+        edTextoInput.focus();
+        return;
+      }
+
+      card.draggable = true;
+
       card.addEventListener("dragstart", (e) => {
+        onCardPointerCancel(t.id);
         e.dataTransfer.setData("text/plain", t.id);
       });
+      card.addEventListener("pointerdown", (e) => onCardPointerDown(t.id, e));
+      card.addEventListener("pointerup", (e) => onCardPointerUp(t.id, e));
+      card.addEventListener("pointercancel", () => onCardPointerCancel(t.id));
+      card.addEventListener("pointerleave", () => onCardPointerCancel(t.id));
 
       const notaHtml = t.nota ? `<div class="card-nota" id="nota_${t.id}">${escapeHtml(t.nota)}</div>` : "";
-      const notaBtn = t.nota ? `<button onclick="toggleNota('${t.id}')">Nota</button>` : "";
+      const notaBtn = t.nota ? `<button onclick="event.stopPropagation();toggleNota('${t.id}')">Nota</button>` : "";
 
       card.innerHTML = `
         <div class="card-top">
           <span class="card-hora">${t.hora ? escapeHtml(t.hora) : ""}</span>
           <div class="priority-dots">
-            <button type="button" class="priority-dot${t.priority==="rojo"?" active":""}" style="background:#B2483C;" onclick="changePriority('${t.id}','rojo')" title="Rojo"></button>
-            <button type="button" class="priority-dot${t.priority==="amarillo"?" active":""}" style="background:#F2B705;" onclick="changePriority('${t.id}','amarillo')" title="Amarillo"></button>
-            <button type="button" class="priority-dot${t.priority==="verde"?" active":""}" style="background:#4C8C5B;" onclick="changePriority('${t.id}','verde')" title="Verde"></button>
+            <button type="button" class="priority-dot${t.priority==="rojo"?" active":""}" style="background:#B2483C;" onclick="event.stopPropagation();changePriority('${t.id}','rojo')" title="Rojo"></button>
+            <button type="button" class="priority-dot${t.priority==="amarillo"?" active":""}" style="background:#F2B705;" onclick="event.stopPropagation();changePriority('${t.id}','amarillo')" title="Amarillo"></button>
+            <button type="button" class="priority-dot${t.priority==="verde"?" active":""}" style="background:#4C8C5B;" onclick="event.stopPropagation();changePriority('${t.id}','verde')" title="Verde"></button>
           </div>
         </div>
         ${t.cliente ? `<div class="card-cliente">${escapeHtml(t.cliente)}</div>` : ""}
         <div class="card-text">${escapeHtml(t.texto)}</div>
         ${notaHtml}
         <div class="card-actions">
-          <button onclick="toggleDone('${t.id}')">${t.done ? "Reabrir" : "Hecho"}</button>
+          <button onclick="event.stopPropagation();toggleDone('${t.id}')">${t.done ? "Reabrir" : "Hecho"}</button>
           ${notaBtn}
-          <button onclick="editTask('${t.id}')">Editar</button>
-          <button onclick="deleteTask('${t.id}')">Borrar</button>
+          <button onclick="event.stopPropagation();editTask('${t.id}')">Editar</button>
+          <button onclick="event.stopPropagation();deleteTask('${t.id}')">Borrar</button>
         </div>
       `;
       col.appendChild(card);
