@@ -9,6 +9,8 @@
 <style>
   :root{
     --accent:#3E6E96;
+    --accent-solid:#2C4F6B;
+    --accent-solid-hover:#213D54;
     --dark:#332F27;
     --btn-bg:#FEFDFA;
     --btn-border:#E3DAC2;
@@ -17,6 +19,9 @@
     --bg:#FAF6EE;
     --dot:#EDE4D0;
     --card-bg:#FFFFFF;
+    --task-bg:#FBFCFD;
+    --header-bg:#F0EADA;
+    --header-text:#332F27;
     --red:#B2483C;
     --yellow:#C99A3E;
     --green:#4C8A5E;
@@ -25,6 +30,8 @@
   }
   body.dark-mode{
     --accent:#6FA8DC;
+    --accent-solid:#3E6E96;
+    --accent-solid-hover:#4E7FA8;
     --dark:#F2F0EA;
     --btn-bg:#23262B;
     --btn-border:#3C4048;
@@ -33,6 +40,9 @@
     --bg:#121417;
     --dot:#1D2024;
     --card-bg:#1B1E22;
+    --task-bg:#24282D;
+    --header-bg:#0D0F11;
+    --header-text:#F6F6F4;
     --red:#E06C5C;
     --yellow:#E8C25A;
     --green:#6FC98A;
@@ -69,7 +79,7 @@
     border-radius:6px;
     padding:2px 6px;
     color:var(--dark);
-    background:#fff;
+    background:var(--card-bg);
   }
 
   .priority-dots{
@@ -113,11 +123,12 @@
   button:disabled{opacity:.45;cursor:not-allowed;}
 
   button.primary{
-    background:var(--accent);
-    border-color:var(--accent);
+    background:var(--accent-solid);
+    border-color:var(--accent-solid);
     color:#fff;
+    font-weight:600;
   }
-  button.primary:hover{background:#1E3ACC;}
+  button.primary:hover{background:var(--accent-solid-hover);border-color:var(--accent-solid-hover);}
 
   .toolbar{
     display:flex;
@@ -136,7 +147,7 @@
     padding:8px 10px;
     border-radius:8px;
     border:1px solid var(--btn-border);
-    background:#fff;
+    background:var(--card-bg);
     color:var(--dark);
   }
   .toolbar input[type="text"]{flex:1;min-width:140px;}
@@ -172,9 +183,11 @@
   .day-header{
     font-weight:700;
     font-size:14px;
-    color:var(--dark);
-    padding-bottom:8px;
-    margin-bottom:8px;
+    color:var(--header-text);
+    background:var(--header-bg);
+    padding:8px 10px;
+    margin:-10px -10px 8px -10px;
+    border-radius:10px 10px 0 0;
     border-bottom:2px solid var(--border);
     display:flex;
     justify-content:space-between;
@@ -187,7 +200,7 @@
     height:20px;
     border-radius:50%;
     border:1px solid var(--accent);
-    background:#fff;
+    background:var(--card-bg);
     color:var(--accent);
     font-size:14px;
     line-height:1;
@@ -214,7 +227,7 @@
     padding:6px 8px;
     border-radius:6px;
     border:1px solid var(--btn-border);
-    background:#fff;
+    background:var(--card-bg);
     color:var(--dark);
   }
   .quick-add-form .quick-add-row{
@@ -233,14 +246,14 @@
   .day-count{
     font-size:11px;
     font-weight:600;
-    color:var(--muted);
-    background:var(--bg);
+    color:var(--header-text);
+    background:rgba(128,128,128,0.25);
     border-radius:10px;
     padding:2px 8px;
   }
 
   .card{
-    background:#FBFCFD;
+    background:var(--task-bg);
     border:1px solid var(--border);
     border-left:4px solid var(--gray-off);
     border-radius:8px;
